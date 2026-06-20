@@ -1,0 +1,59 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/workspace:cached
+    working_dir: /workspace/backend
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - chromadb
+      - redis
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/workspace:cached
+    working_dir: /workspace/frontend
+    env_file:
+      - ./frontend/.env.local
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: contracts
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  chromadb:
+    image: chromadb/chroma:latest
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - chromadata:/chroma/chroma
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  chromadata:
+  redisdata:

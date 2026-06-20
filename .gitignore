@@ -1,0 +1,25 @@
+# Secrets
+.env
+.env.local
+*.env
+!.env.example
+!.env.local.example
+
+# Node
+node_modules/
+.next/
+out/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Data (Postgres/Chroma volumes are docker-managed, not bind-mounted, but just in case)
+data/
+
+# OS / editor
+.DS_Store
+.vscode/
+*.log
