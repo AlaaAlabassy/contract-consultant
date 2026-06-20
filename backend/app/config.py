@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_drive_root_folder_id: str = ""
     google_archiving_matrix_file_id: str = ""
+    # Refresh token from a one-time offline OAuth consent (drive.readonly +
+    # spreadsheets.readonly), used by the backend's own ingestion jobs/CLI so
+    # they can run independently of an interactive frontend session.
+    google_refresh_token: str = ""
 
     # OpenRouter
     openrouter_api_key: str = ""
