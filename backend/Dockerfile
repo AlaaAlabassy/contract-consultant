@@ -4,6 +4,9 @@ WORKDIR /workspace/backend
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-ara \
     && rm -rf /var/lib/apt/lists/*
 
 # CPU-only torch first - the default PyPI wheel pulls a CUDA build (2GB+)
