@@ -22,32 +22,32 @@
 
 ### المفاتيح والإعدادات المطلوبة (قبل الاستخدام الفعلي)
 
-انسخ `.env.example` إلى `.env` (وكذلك `frontend/.env.local.example` إلى `frontend/.env.local`) وعبّئ:
+انسخ `.env.example` إلى `.env` وعبّئ:
 
 | المتغير | المصدر |
 |---|---|
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google Cloud Console → OAuth 2.0 Client (فعّل Drive API + Sheets API). Redirect URI = رابط Codespaces المُوجَّه للمنفذ 3000 |
-| `NEXTAUTH_SECRET` | أي قيمة عشوائية قوية، مثلاً `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | رابط Codespaces المُوجَّه للمنفذ 3000 |
+| `GOOGLE_SERVICE_ACCOUNT_FILE` | مسار مفتاح Service Account (انظر أدناه) — لا حاجة لـ OAuth أو متصفح |
 | `GOOGLE_DRIVE_ROOT_FOLDER_ID` | معرّف مجلد Drive الجذري (مثلاً مجلد 01-Contracts) |
 | `GOOGLE_ARCHIVING_MATRIX_FILE_ID` | معرّف ملف/شيت Archiving Matrix |
-| `GOOGLE_REFRESH_TOKEN` | ناتج تشغيل `scripts/get_refresh_token.py` مرة واحدة (انظر أدناه) |
 | `OPENROUTER_API_KEY` | openrouter.ai |
 
-**أفضل ممارسة**: أضف هذه القيم كـ **Codespaces Secrets** (Settings → Codespaces → Secrets) بدلاً من كتابتها في `.env` محلياً — تُحقن تلقائياً عند إنشاء أي Codespace جديد.
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `NEXTAUTH_*` غير مطلوبة حالياً — كانت لتسجيل دخول تفاعلي للواجهة، وتم تأجيلها لأن المستخدم وحيد ولا حاجة فعلية لها في هذه المرحلة.
+
+**أفضل ممارسة**: أضف هذه القيم كـ **Codespaces Secrets** بدلاً من كتابتها في `.env` محلياً — تُحقن تلقائياً عند إنشاء أي Codespace جديد.
 
 لا حاجة لمفتاح embeddings — تعمل محلياً عبر `sentence-transformers` (نموذج متعدد اللغات) داخل حاوية الـ backend.
 
-### الحصول على GOOGLE_REFRESH_TOKEN (مرة واحدة فقط)
+### الوصول إلى Google Drive (Service Account — بدون متصفح أو OAuth)
 
-تسجيل الدخول التفاعلي عبر NextAuth في الواجهة يُستخدم لجلسة المستخدم فقط. عمليات الفهرسة (Ingestion) في الـ backend تحتاج Refresh Token مستقل يعمل بدون متصفح مفتوح. لأن هذا يتطلب فتح متصفح أثناء التفويض، **شغّل هذا السكربت من جهازك المحلي** (لا داخل Codespace، حيث لا يوجد متصفح):
+الـ backend يتصل بـ Drive باسم حساب خدمة (Service Account) مستقل تماماً عن أي تسجيل دخول بشري. المفتاح محفوظ محلياً في `backend/secrets/service-account.json` (مُستثنى من git تماماً، لن يُرفع أبداً).
 
-```bash
-pip install google-auth-oauthlib
-GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... python scripts/get_refresh_token.py
+**الخطوة المطلوبة منك**: شارك مجلدات Drive (01-Contracts، 02-Specifications، وملف/شيت Archiving Matrix) مع بريد حساب الخدمة كـ **Viewer**:
+
+```
+contract-consultant-agent@contract-consultant.iam.gserviceaccount.com
 ```
 
-سيفتح متصفحك لتسجيل الدخول وتفويض صلاحية القراءة على Drive، وفي النهاية يطبع Refresh Token — أضفه كـ `GOOGLE_REFRESH_TOKEN` في `.env` أو كـ Codespaces Secret.
+(افتح كل مجلد في Drive → Share → ألصق هذا البريد → Viewer → Send)
 
 ### تجهيز قاعدة البيانات وتشغيل الفهرسة (داخل Codespace)
 

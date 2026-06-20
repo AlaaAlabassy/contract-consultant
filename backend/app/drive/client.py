@@ -1,17 +1,17 @@
 """Thin wrapper around the Google Drive v3 / Sheets v4 APIs.
 
-Uses a long-lived refresh token (obtained once via scripts/get_refresh_token.py)
-so ingestion jobs can run without an interactive browser session. This is
-separate from the frontend's NextAuth session, which authenticates the human
-user for live requests.
+Authenticates as a Google Cloud service account (no browser, no OAuth consent
+screen, no refresh token to babysit). This is purely for the backend's own
+ingestion jobs; it has no relation to any human login. For the service
+account to actually see anything, the user must share the relevant Drive
+folders with the service account's client_email as Viewer.
 """
 
 from __future__ import annotations
 
 import io
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
@@ -27,22 +27,15 @@ FOLDER_MIME = "application/vnd.google-apps.folder"
 SHEET_MIME = "application/vnd.google-apps.spreadsheet"
 
 
-def _credentials() -> Credentials:
-    if not settings.google_refresh_token:
+def _credentials() -> service_account.Credentials:
+    if not settings.google_service_account_file:
         raise RuntimeError(
-            "GOOGLE_REFRESH_TOKEN is not set. Run scripts/get_refresh_token.py once and "
-            "add the result to .env / Codespaces secrets."
+            "GOOGLE_SERVICE_ACCOUNT_FILE is not set. Point it at the service account "
+            "JSON key (kept outside git, e.g. backend/secrets/service-account.json)."
         )
-    creds = Credentials(
-        token=None,
-        refresh_token=settings.google_refresh_token,
-        client_id=settings.google_client_id,
-        client_secret=settings.google_client_secret,
-        token_uri="https://oauth2.googleapis.com/token",
-        scopes=SCOPES,
+    return service_account.Credentials.from_service_account_file(
+        settings.google_service_account_file, scopes=SCOPES
     )
-    creds.refresh(Request())
-    return creds
 
 
 def _drive_service():

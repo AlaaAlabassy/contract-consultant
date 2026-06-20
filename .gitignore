@@ -4,6 +4,7 @@
 *.env
 !.env.example
 !.env.local.example
+backend/secrets/
 
 # Node
 node_modules/

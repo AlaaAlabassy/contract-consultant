@@ -4,15 +4,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Google OAuth / Drive
-    google_client_id: str = ""
-    google_client_secret: str = ""
+    # Google Drive (backend ingestion - service account, no browser/OAuth needed).
+    # The user must share the Drive folders with this service account's email.
+    google_service_account_file: str = "secrets/service-account.json"
     google_drive_root_folder_id: str = ""
     google_archiving_matrix_file_id: str = ""
-    # Refresh token from a one-time offline OAuth consent (drive.readonly +
-    # spreadsheets.readonly), used by the backend's own ingestion jobs/CLI so
-    # they can run independently of an interactive frontend session.
-    google_refresh_token: str = ""
+
+    # Google OAuth (only needed later if/when an interactive frontend login is added)
+    google_client_id: str = ""
+    google_client_secret: str = ""
 
     # OpenRouter
     openrouter_api_key: str = ""
