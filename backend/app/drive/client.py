@@ -10,6 +10,7 @@ folders with the service account's client_email as Viewer.
 from __future__ import annotations
 
 import io
+import json
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -28,13 +29,15 @@ SHEET_MIME = "application/vnd.google-apps.spreadsheet"
 
 
 def _credentials() -> service_account.Credentials:
-    if not settings.google_service_account_file:
-        raise RuntimeError(
-            "GOOGLE_SERVICE_ACCOUNT_FILE is not set. Point it at the service account "
-            "JSON key (kept outside git, e.g. backend/secrets/service-account.json)."
+    if settings.google_service_account_json:
+        info = json.loads(settings.google_service_account_json)
+        return service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+    if settings.google_service_account_file:
+        return service_account.Credentials.from_service_account_file(
+            settings.google_service_account_file, scopes=SCOPES
         )
-    return service_account.Credentials.from_service_account_file(
-        settings.google_service_account_file, scopes=SCOPES
+    raise RuntimeError(
+        "Neither GOOGLE_SERVICE_ACCOUNT_JSON nor GOOGLE_SERVICE_ACCOUNT_FILE is set."
     )
 
 

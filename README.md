@@ -20,26 +20,24 @@
    docker compose ps
    ```
 
-### المفاتيح والإعدادات المطلوبة (قبل الاستخدام الفعلي)
+### المفاتيح والإعدادات المطلوبة
 
-انسخ `.env.example` إلى `.env` وعبّئ:
+كل القيم الحساسة تُحفظ كـ **Codespaces Secrets** (لا توجد ملفات `.env` محلية مطلوبة في Codespaces — `docker-compose.yml` يقرأ هذه الأسرار مباشرة من بيئة الـ Codespace):
 
-| المتغير | المصدر |
+| السر (Secret) | المصدر |
 |---|---|
-| `GOOGLE_SERVICE_ACCOUNT_FILE` | مسار مفتاح Service Account (انظر أدناه) — لا حاجة لـ OAuth أو متصفح |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | محتوى كامل لملف مفتاح Service Account (JSON) — لا حاجة لـ OAuth أو متصفح |
 | `GOOGLE_DRIVE_ROOT_FOLDER_ID` | معرّف مجلد Drive الجذري (مثلاً مجلد 01-Contracts) |
 | `GOOGLE_ARCHIVING_MATRIX_FILE_ID` | معرّف ملف/شيت Archiving Matrix |
 | `OPENROUTER_API_KEY` | openrouter.ai |
 
 `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `NEXTAUTH_*` غير مطلوبة حالياً — كانت لتسجيل دخول تفاعلي للواجهة، وتم تأجيلها لأن المستخدم وحيد ولا حاجة فعلية لها في هذه المرحلة.
 
-**أفضل ممارسة**: أضف هذه القيم كـ **Codespaces Secrets** بدلاً من كتابتها في `.env` محلياً — تُحقن تلقائياً عند إنشاء أي Codespace جديد.
-
 لا حاجة لمفتاح embeddings — تعمل محلياً عبر `sentence-transformers` (نموذج متعدد اللغات) داخل حاوية الـ backend.
 
 ### الوصول إلى Google Drive (Service Account — بدون متصفح أو OAuth)
 
-الـ backend يتصل بـ Drive باسم حساب خدمة (Service Account) مستقل تماماً عن أي تسجيل دخول بشري. المفتاح محفوظ محلياً في `backend/secrets/service-account.json` (مُستثنى من git تماماً، لن يُرفع أبداً).
+الـ backend يتصل بـ Drive باسم حساب خدمة (Service Account) مستقل تماماً عن أي تسجيل دخول بشري. مفتاحه محفوظ كـ Codespaces Secret فقط (`GOOGLE_SERVICE_ACCOUNT_JSON`) — غير موجود كملف في المستودع أبداً.
 
 **الخطوة المطلوبة منك**: شارك مجلدات Drive (01-Contracts، 02-Specifications، وملف/شيت Archiving Matrix) مع بريد حساب الخدمة كـ **Viewer**:
 
@@ -48,6 +46,8 @@ contract-consultant-agent@contract-consultant.iam.gserviceaccount.com
 ```
 
 (افتح كل مجلد في Drive → Share → ألصق هذا البريد → Viewer → Send)
+
+> إذا كنت تطوّر محلياً خارج Codespaces بدلاً من ذلك: انسخ `.env.example` إلى `.env` وعبّئ القيم نفسها (يمكن استخدام `GOOGLE_SERVICE_ACCOUNT_FILE` بمسار ملف محلي بدلاً من `GOOGLE_SERVICE_ACCOUNT_JSON`).
 
 ### تجهيز قاعدة البيانات وتشغيل الفهرسة (داخل Codespace)
 

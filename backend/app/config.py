@@ -6,6 +6,9 @@ class Settings(BaseSettings):
 
     # Google Drive (backend ingestion - service account, no browser/OAuth needed).
     # The user must share the Drive folders with this service account's email.
+    # Either the raw JSON content (e.g. from a Codespaces secret) or a file
+    # path works - the JSON content takes precedence if both are set.
+    google_service_account_json: str = ""
     google_service_account_file: str = "secrets/service-account.json"
     google_drive_root_folder_id: str = ""
     google_archiving_matrix_file_id: str = ""

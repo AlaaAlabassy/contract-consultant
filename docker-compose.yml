@@ -6,8 +6,23 @@ services:
     volumes:
       - .:/workspace:cached
     working_dir: /workspace/backend
-    env_file:
-      - .env
+    environment:
+      # Secrets come from Codespaces secrets (already exported into the shell
+      # that runs `docker compose up`), substituted here instead of relying on
+      # an .env file - which is gitignored and won't exist on a fresh clone.
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      GOOGLE_DRIVE_ROOT_FOLDER_ID: ${GOOGLE_DRIVE_ROOT_FOLDER_ID:-}
+      GOOGLE_ARCHIVING_MATRIX_FILE_ID: ${GOOGLE_ARCHIVING_MATRIX_FILE_ID:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: https://openrouter.ai/api/v1
+      EMBEDDING_MODEL: intfloat/multilingual-e5-small
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/contracts
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: "8000"
+      REDIS_URL: redis://redis:6379/0
+      CONFIDENCE_HIGH: "0.90"
+      CONFIDENCE_WARN: "0.70"
+      CONFIDENCE_REFUSE: "0.50"
     depends_on:
       - postgres
       - chromadb
@@ -20,8 +35,8 @@ services:
     volumes:
       - .:/workspace:cached
     working_dir: /workspace/frontend
-    env_file:
-      - ./frontend/.env.local
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
     depends_on:
       - backend
 
