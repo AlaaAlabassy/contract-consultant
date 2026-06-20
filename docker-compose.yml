@@ -53,7 +53,7 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   chromadb:
-    image: chromadb/chroma:0.5.23
+    image: chromadb/chroma:0.4.24
     restart: unless-stopped
     ports:
       - "8001:8000"
