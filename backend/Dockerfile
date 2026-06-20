@@ -4,8 +4,12 @@ WORKDIR /workspace/backend
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    libgl1 \
     && rm -rf /var/lib/apt/lists/*
+
+# CPU-only torch first - the default PyPI wheel pulls a CUDA build (2GB+)
+# that is both unnecessary (no GPU here) and slow enough to make the
+# container build look stuck.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
