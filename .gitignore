@@ -10,6 +10,8 @@ backend/secrets/
 node_modules/
 .next/
 out/
+*.tsbuildinfo
+next-env.d.ts
 
 # Python
 __pycache__/

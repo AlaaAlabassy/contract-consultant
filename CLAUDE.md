@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 مستشار العقود (Contract Consultant) — an Arabic-language agent that connects to Google Drive, reads construction contracts (PDF/DOCX/Google Docs), and answers questions strictly from document evidence with citation-lock (page + clause citations, confidence-gated answers). Planned features beyond Q&A: risk scanning, contract comparison, cross-document smart search, and a claims-entitlement assistant. Contracts are in English (FIDIC/construction style); the UI/chat/answers are Arabic + RTL, but evidence quotes stay in the original English.
 
-Current status: Phase 0 (infra) and Phase 1 (Drive ingestion pipeline) are built. RAG/citation-lock QA, the chat frontend, and risk/compare/search/claims features are not yet implemented (see README.md "حالة المشروع" for the phase breakdown).
+Current status: Phase 0 (infra), Phase 1 (Drive ingestion pipeline), Phase 2 (RAG/citation-lock QA + chat frontend), and risk scanning are built. Contract comparison, cross-document smart search, and the claims-entitlement assistant are not yet implemented (see README.md "حالة المشروع" for the phase breakdown).
 
 ## Critical environment constraint
 
@@ -32,13 +32,24 @@ curl localhost:8000/api/ingest/status
 # Backend health check
 curl localhost:8000/api/health
 
+# Ask a citation-lock question (RAG QA)
+curl -X POST localhost:8000/api/qa/ask -H "Content-Type: application/json" -d '{"question": "..."}'
+
+# Run/poll the risk scanner for one ingested contract
+curl -X POST localhost:8000/api/risk/scan -H "Content-Type: application/json" -d '{"contract_id": 1}'
+curl "localhost:8000/api/risk/scan/status?contract_id=1"
+curl localhost:8000/api/risk/1
+
+# Backend unit tests (pytest; stubs out chromadb/sentence-transformers if absent, see tests/conftest.py)
+cd backend && pip install -r requirements-dev.txt && pytest
+
 # Frontend dev server
 cd frontend && npm run dev      # next dev -p 3000
 cd frontend && npm run build
 cd frontend && npm run lint
 ```
 
-No backend test suite or linter is configured yet. There is no Alembic autogenerate workflow established beyond the single `0001_initial_schema` migration — write new migrations by hand following that file's style.
+No backend linter is configured yet (`next lint` also has no ESLint config committed - it prompts interactively). Backend unit tests so far cover `app/rag/qa.py`, `app/rag/citation_lock.py`, `app/rag/retrieval.py`, and `app/risk/scanner.py` — there is no test coverage for ingestion, parsing, or the DB layer. There is no Alembic autogenerate workflow established beyond the single `0001_initial_schema` migration — write new migrations by hand following that file's style.
 
 ## Architecture
 
@@ -53,8 +64,9 @@ FastAPI (Python) backend
    |-- Embeddings (local sentence-transformers, multilingual) -> ChromaDB
    |-- Postgres (SQLAlchemy + Alembic) -- registry, clauses, chat history, risk/compare cache
    |-- Redis -- reserved for rate limiting (not yet wired up)
-   |-- (planned) RAG retrieval + OpenRouter LLM calls, citation-lock confidence scorer
-   |-- (planned) Risk scanner / Compare / Smart search / Claims assistant
+   |-- RAG retrieval + OpenRouter LLM calls, citation-lock confidence scorer (app/rag/)
+   |-- Risk scanner (app/risk/) -- built on the same citation-lock primitives as RAG QA
+   |-- (planned) Compare / Smart search / Claims assistant
 ```
 
 5 docker-compose services: `frontend` (:3000), `backend` (:8000), `postgres` (:5432), `chromadb` (:8001 externally, :8000 internally), `redis` (:6379).
@@ -83,9 +95,17 @@ Local, free, multilingual via `sentence-transformers` (`intfloat/multilingual-e5
 
 `chromadb` (backend) and the `chromadb/chroma` server image (docker-compose) are deliberately pinned to **0.4.24** (the older v1 HTTP API), not `latest`/0.5.x. Newer 0.5.x client/server combinations hit a known `KeyError: '_type'` bug in `CollectionConfigurationInternal.from_json` when creating a collection via the v2 API with simple `metadata={"hnsw:space": "cosine"}` (no explicit `configuration`). Keep client and server versions identical when touching either.
 
+### Citation-lock (`backend/app/rag/citation_lock.py`, shared by QA and risk scanning)
+
+The model is always shown a numbered list of retrieved clauses and may only cite by that number — it never supplies its own quote text, clause number, or page reference. `resolve_citations()` drops any index that's out of range, wrong-typed (including `bool`, since `isinstance(True, int)` is `True` in Python), or duplicated; `parse_json_object()` turns any non-JSON-object LLM response into `None` rather than raising. Both `app/rag/qa.py` (answers) and `app/risk/scanner.py` (risk findings) build on these two functions: a result is only produced if the LLM both confirms it *and* cites at least one verifiable chunk, and the resulting confidence is `min()` of the cited chunks' retrieval similarity — never the LLM's own self-reported confidence. Confidence bands (`app/config.py` `confidence_high`/`warn`/`refuse`): >0.90 high, 0.70-0.90 warn, 0.50-0.70 red, <0.50 refuse with "no supporting evidence".
+
+### Risk scanning (`backend/app/risk/`)
+
+`catalog.py` holds a fixed list of FIDIC/construction red-flag categories (`RiskRule`: `rule_key`, an Arabic `query_ar` used to retrieve candidate clauses, `description_ar` given to the LLM, and a static `severity`). `scanner.scan_contract(contract_id)` checks each rule independently — one rule's LLM failure is logged and skipped, never aborts the rest of the scan. `app/api/routes_risk.py` runs scans as a background task (same in-memory-status pattern as `routes_ingestion.py`) and persists one `RiskResult` row per (rule, cited clause) pair, deleting prior results for that contract first (rescans are idempotent, not additive).
+
 ### Database models (`backend/app/db/models.py`)
 
-`Contract` (1) -> `Clause` (many), plus `ChatMessage`, `RiskResult`, `CompareResult` — the latter three are schema-only placeholders for the not-yet-built RAG/risk/compare features; their `confidence`/`clause_number`/`page_number` fields anticipate the citation-lock pattern described in the README's planned Phase 2 (confidence bands: >0.90 high, 0.70-0.90 warn, 0.50-0.70 red warning, <0.50 refuse with "no supporting evidence").
+`Contract` (1) -> `Clause` (many), plus `ChatMessage`, `RiskResult` (now populated by `app/risk/scanner.py`), and `CompareResult` (still a schema-only placeholder for the not-yet-built contract-comparison feature).
 
 ## Secrets
 
