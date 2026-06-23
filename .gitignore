@@ -5,6 +5,7 @@
 !.env.example
 !.env.local.example
 backend/secrets/
+Materials/*.json
 
 # Node
 node_modules/
