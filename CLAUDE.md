@@ -2,35 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-<!-- ════════════════════════════════════════════════════════════════════════
-     SESSION RESUME — استئناف الجلسة (آخر تحديث: 2026-06-23 ليلاً)
-     احذف هذا القسم بعد اكتمال التحقق الحي وعودة المشروع لوضعه الطبيعي.
-     ════════════════════════════════════════════════════════════════════════ -->
-## ⏸️ نقطة الاستئناف (اقرأ هذا أولاً)
-
-**أين توقّفنا:** كل كود الواجهة الخلفية والأمامية (QA + فحص المخاطر + واجهة المحادثة RTL) مبنيٌّ ومُختبَر (54/54 اختبار وحدة ناجح) ومحفوظٌ ومدفوعٌ بالكامل إلى `origin/main` (شجرة العمل نظيفة، `0 0` ahead/behind). كنا في منتصف **أول تحقّق حيّ من طرف إلى طرف** داخل Codespace.
-
-**ما تم التحقق منه حيّاً بنجاح هذه الجلسة:**
-- `numpy 1.26.4` (إصلاح تعارض chromadb 0.4.24 مع NumPy 2.0 — commit `f0bbdf2`)، `alembic upgrade head` نجح، و`/api/health` يُرجع `{'status': 'ok'}`.
-- الأسرار موجودة (Drive folder + service-account JSON)، و`POST /api/ingest/run` بدأ الاستيعاب فعلياً على مجلد Drive حقيقي (folder_id `1X5FW44bFPs-tzrOzToCAYwKZ_xipxLW_`، ~30 عقداً أغلبها ممسوح ضوئياً).
-
-**الحالة وقت التوقّف:** الاستيعاب كان لا يزال `running` (عملية python بـ~90% CPU، طبيعي بسبب OCR على 30 عقداً ممسوحاً — متوقّع أن يطول ساعة+). العدّاد في DB يبقى 0 حتى النهاية لأن `run_ingestion` يلتزم (commit) مرّة واحدة فقط بعد كل الملفات.
-
-**الـ Codespace النشط:** `fantastic-parakeet-5gqq9664vx7627w6g` (machine: standardLinux32gb). تُرك يعمل ليلاً لإكمال الاستيعاب.
-
-**⚠️ قيد بيئي مهم اكتُشف:** SSH عبر `gh codespace ssh` و port-forward **غير موثوقَين** من شبكة المستخدم (تعليق/Connection refused متقطّع — حجب نفق dev tunnels). القناة الموثوقة الوحيدة هي **طرفية المتصفح** (VS Code Web). التقسيم: المستخدم ينفّذ الأوامر في طرفية المتصفح ويلصق الناتج؛ المساعد يحلّل ويوجّه. طرفية المتصفح الافتراضية تكون **داخل حاوية backend** (فيها python/pip/alembic/uvicorn/httpx، وبلا git/docker/curl).
-
-**الخطوات التالية عند الاستئناف (بالترتيب):**
-1. في طرفية المتصفح للـ Codespace، افحص حالة الاستيعاب:
-   `python -c "import httpx, json; print(json.dumps(httpx.get('http://localhost:8000/api/ingest/status', timeout=30).json(), ensure_ascii=False, indent=2))"`
-2. إن لم تكتمل بعد، انتظر دون إزعاج الخادم (كل استعلام يزاحم OCR على المعالج). إن `error`، اعرض الرسالة.
-3. عند `done`: راجع ملخّص `ingested/skipped/failed`، ثم نفّذ **التحقق النهائي**:
-   - سؤال QA حقيقي: `POST /api/qa/ask` بسؤال عربي عن بند فعلي (مثلاً عن الدفعة المقدمة أو غرامات التأخير) — تأكّد من `answer_ar` + اقتباس إنجليزي حرفي + `confidence_label`.
-   - فحص مخاطر: `POST /api/risk/scan` بـ `{"contract_id": <id>}`، ثم `GET /api/risk/scan/status?contract_id=<id>` حتى `done`، ثم `GET /api/risk/<id>` لعرض النتائج.
-4. (تحسين معماري مؤجَّل، ليس عائقاً): الاستيعاب يعمل كـ `BackgroundTask` داخل عملية الخادم ويُشبع المعالج فيبطّئ بقية الطلبات؛ والالتزام مرّة واحدة في النهاية يفقد التقدّم الجزئي عند أي انهيار. يُفضَّل لاحقاً نقله لعامل منفصل والالتزام بعد كل عقد.
-
-<!-- ════════════════ نهاية قسم الاستئناف ════════════════ -->
-
 ## Project
 
 مستشار العقود (Contract Consultant) — an Arabic-language agent that connects to Google Drive, reads construction contracts (PDF/DOCX/Google Docs), and answers questions strictly from document evidence with citation-lock (page + clause citations, confidence-gated answers). Planned features beyond Q&A: risk scanning, contract comparison, cross-document smart search, and a claims-entitlement assistant. Contracts are in English (FIDIC/construction style); the UI/chat/answers are Arabic + RTL, but evidence quotes stay in the original English.
@@ -107,6 +78,8 @@ The backend authenticates to Drive/Sheets as a **Google Cloud service account** 
 ### Ingestion pipeline (`backend/app/ingestion/pipeline.py`)
 
 `run_ingestion(folder_id)` recursively lists Drive files, and per file: parses pages -> clause-splits -> embeds -> upserts into Chroma -> writes `Contract`/`Clause` rows in Postgres. It's incremental and idempotent: a file is skipped if its `drive_modified_time` hasn't advanced since `last_ingested_at`; re-ingesting a changed file deletes its old Chroma chunks (`chroma_store.delete_by_contract`) and `Clause` rows before re-inserting. Chunk IDs are `"{contract_id}:{chunk_index}"`, shared between Chroma and `Clause.chroma_chunk_id` — this is the join key between the vector store and the relational registry, and the invariant to preserve when touching either side. All contracts share a single Chroma collection (`contract_clauses`) rather than one per contract, since cross-document Smart Search (planned) needs to query the whole corpus without a contract filter.
+
+Known limitations observed in live runs (deferred, not blocking): ingestion runs as a FastAPI `BackgroundTask` in the server process, so the CPU-bound OCR/embedding work saturates the worker and makes concurrent `/api/...` requests (incl. `/ingest/status`) slow or time out — move to a separate worker if this matters. A long unattended run also won't survive the Codespace idle auto-stop (~30 min). The clause splitter occasionally mis-detects page-header dates (e.g. "09 February 2026") as clause numbers — harmless to retrieval but worth tightening.
 
 ### PDF parsing fallback cascade (`backend/app/parsing/pdf_parser.py`)
 
