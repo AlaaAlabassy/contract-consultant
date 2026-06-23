@@ -197,17 +197,33 @@ def test_low_similarity_evidence_still_resolves_below_refuse_threshold(monkeypat
 # --- Ambiguous / malformed LLM output ---------------------------------------
 
 
-def test_markdown_fenced_json_is_treated_as_malformed(monkeypatch):
-    """response_format=json_object should prevent this, but if a model still
-    wraps its output in a ```json fence, citation-lock must fail closed
-    (refuse) rather than attempt lenient parsing that could mask bad output."""
+def test_markdown_fenced_json_is_parsed_not_refused(monkeypatch):
+    """anthropic/claude-sonnet-4.6 via OpenRouter wraps its JSON in a ```json
+    fence even with response_format=json_object (confirmed in live testing), so
+    the fence must be stripped and the answer honored - not thrown away. The
+    citation-lock guarantee is unaffected: the quote still comes from evidence."""
     _stub_retrieval(monkeypatch)
     _stub_llm(
         monkeypatch,
-        raw_text='```json\n{"supported": true, "answer_ar": "x", "citation_indices": [1]}\n```',
+        raw_text='```json\n{"supported": true, "answer_ar": "إجابة", "citation_indices": [1]}\n```',
     )
     result = answer_question("سؤال")
-    assert result.confidence_label == "refuse"
+    assert result.confidence_label != "refuse"
+    assert result.answer_ar == "إجابة"
+    assert result.citations[0].quote_en == EVIDENCE[0].text
+
+
+def test_json_with_surrounding_prose_is_extracted(monkeypatch):
+    """Some responses prepend prose before the JSON object; the first {...}
+    span should still be extracted rather than degrading to a refusal."""
+    _stub_retrieval(monkeypatch)
+    _stub_llm(
+        monkeypatch,
+        raw_text='Here is my answer:\n{"supported": true, "answer_ar": "إجابة", "citation_indices": [1]}',
+    )
+    result = answer_question("سؤال")
+    assert result.confidence_label != "refuse"
+    assert result.answer_ar == "إجابة"
 
 
 def test_json_top_level_array_is_treated_as_malformed(monkeypatch):

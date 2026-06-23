@@ -10,11 +10,21 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 
 from app.rag.retrieval import EvidenceChunk
 
 logger = logging.getLogger(__name__)
+
+# Models (e.g. anthropic/claude-sonnet-4.6 via OpenRouter) routinely wrap their
+# JSON in a ```json ... ``` markdown fence even when response_format=json_object
+# is requested, so we must strip the fence before parsing rather than rejecting
+# an otherwise-valid answer. Citation-lock is unaffected: citations are still
+# resolved by index against the evidence, never from the model's own text.
+_FENCE_OPEN = re.compile(r"^```[a-zA-Z0-9]*\s*")
+_FENCE_CLOSE = re.compile(r"\s*```$")
+_FIRST_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
 
 
 @dataclass
@@ -27,16 +37,33 @@ class Citation:
 
 def parse_json_object(raw: str) -> dict | None:
     """Parses `raw` as a JSON object, returning None (never raising) on any
-    malformed or non-object response - callers treat None as a refusal."""
-    try:
-        parsed = json.loads(raw)
-    except Exception:  # noqa: BLE001 - any parse failure degrades to None
-        logger.exception("Failed to parse LLM response as JSON: %r", raw)
+    malformed or non-object response - callers treat None as a refusal.
+    Tolerates markdown code fences and surrounding prose the model may add."""
+    if not raw:
         return None
-    if not isinstance(parsed, dict):
-        logger.warning("LLM response is not a JSON object: %r", raw)
-        return None
+
+    text = raw.strip()
+    if text.startswith("```"):
+        text = _FENCE_CLOSE.sub("", _FENCE_OPEN.sub("", text)).strip()
+
+    parsed = _try_load_object(text)
+    if parsed is None:
+        # Last resort: extract the first {...} span (handles leading/trailing prose).
+        match = _FIRST_OBJECT.search(text)
+        if match:
+            parsed = _try_load_object(match.group(0))
+
+    if parsed is None:
+        logger.warning("Could not parse a JSON object from LLM response: %r", raw)
     return parsed
+
+
+def _try_load_object(text: str) -> dict | None:
+    try:
+        value = json.loads(text)
+    except Exception:  # noqa: BLE001 - any parse failure degrades to None
+        return None
+    return value if isinstance(value, dict) else None
 
 
 def resolve_citations(

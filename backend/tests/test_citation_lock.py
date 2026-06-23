@@ -42,6 +42,21 @@ def test_parse_json_object_returns_dict_for_valid_object():
     assert parse_json_object('{"a": 1}') == {"a": 1}
 
 
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '```json\n{"a": 1}\n```',
+        '```\n{"a": 1}\n```',
+        'Here is the answer:\n{"a": 1}',
+        '{"a": 1}\nHope that helps!',
+    ],
+)
+def test_parse_json_object_strips_fences_and_prose(raw):
+    """Live testing showed claude-sonnet-4.6 fences its JSON despite
+    response_format=json_object; the parser must recover the object."""
+    assert parse_json_object(raw) == {"a": 1}
+
+
 def test_resolve_citations_empty_list_returns_empty():
     citations, similarities = resolve_citations([], EVIDENCE)
     assert citations == []
