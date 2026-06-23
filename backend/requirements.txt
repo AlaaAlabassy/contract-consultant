@@ -5,6 +5,7 @@ sqlalchemy==2.0.36
 alembic==1.14.0
 psycopg2-binary==2.9.10
 chromadb==0.4.24
+numpy<2  # chromadb 0.4.24 references np.float_/np.uint, removed in NumPy 2.0
 redis==5.2.1
 sentence-transformers==3.3.1
 pymupdf==1.25.1
