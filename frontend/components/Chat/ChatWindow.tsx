@@ -34,9 +34,7 @@ export default function ChatWindow() {
   }
 
   return (
-    <div className="mx-auto flex h-screen max-w-3xl flex-col p-4">
-      <h1 className="mb-4 text-2xl font-bold">مستشار العقود</h1>
-
+    <div className="mx-auto flex h-full max-w-3xl flex-col p-4">
       <div className="flex-1 space-y-3 overflow-y-auto">
         {turns.length === 0 && (
           <p className="text-gray-500">اطرح سؤالاً عن أحد العقود المستوعبة لتبدأ المحادثة.</p>

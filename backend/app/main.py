@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes_contracts import router as contracts_router
 from app.api.routes_ingestion import router as ingestion_router
 from app.api.routes_qa import router as qa_router
 from app.api.routes_risk import router as risk_router
@@ -14,6 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(contracts_router)
 app.include_router(ingestion_router)
 app.include_router(qa_router)
 app.include_router(risk_router)
