@@ -35,6 +35,11 @@ services:
     volumes:
       - .:/workspace:cached
     working_dir: /workspace/frontend
+    # The repo bind-mount above shadows the image's node_modules with the host's
+    # /workspace/frontend (which has none), leaving `next` missing and crashing
+    # `npm run dev` -> 502. Install into the mounted volume at startup so the
+    # deps persist on the volume and survive container recreation.
+    command: sh -c "npm install && npm run dev"
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
     depends_on:
